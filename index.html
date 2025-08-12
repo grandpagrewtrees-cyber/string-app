@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Music Trainer</title>
+<style>
+  html, body {
+    height: 100%;
+    margin: 0;
+    font-family: sans-serif;
+    background: #0f1220;
+    color: #fff;
+  }
+  body.embed {
+    background: transparent;
+    display: block;
+    padding: 0;
+  }
+  .app {
+    max-width: 1100px;
+    margin: auto;
+    padding: 10px;
+    border-radius: 8px;
+    background: #171a2b;
+  }
+  body.embed .app {
+    width: 100%;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+    padding: 10px 8px;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <h1>Music Trainer App</h1>
+  <p>This is where your interactive trainer code will run.</p>
+</div>
+
+<script>
+(function(){
+  const params = new URLSearchParams(location.search);
+  const EMBED   = params.get('embed')   === '1' || params.get('embed')   === 'true';
+  const COMPACT = params.get('compact') === '1' || params.get('compact') === 'true';
+
+  if (EMBED) { document.body.classList.add('embed'); }
+  if (COMPACT) {
+    const titleEl = document.querySelector('h1');
+    if (titleEl) titleEl.style.fontSize = 'clamp(14px,3.5vw,20px)';
+  }
+
+  function postSize(){
+    const h = document.documentElement.scrollHeight;
+    try { parent.postMessage({ type:'trainer-resize', height:h }, '*'); } catch(e){}
+  }
+  const ro = new ResizeObserver(postSize);
+  ro.observe(document.documentElement);
+  window.addEventListener('load', postSize);
+  window.addEventListener('resize', postSize);
+  setTimeout(postSize, 300);
+})();
+</script>
+</body>
+</html>
