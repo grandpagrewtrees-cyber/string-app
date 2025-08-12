@@ -1,66 +1,381 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Music Trainer</title>
-<style>
-  html, body {
-    height: 100%;
-    margin: 0;
-    font-family: sans-serif;
-    background: #0f1220;
-    color: #fff;
-  }
-  body.embed {
-    background: transparent;
-    display: block;
-    padding: 0;
-  }
-  .app {
-    max-width: 1100px;
-    margin: auto;
-    padding: 10px;
-    border-radius: 8px;
-    background: #171a2b;
-  }
-  body.embed .app {
-    width: 100%;
-    border: none;
-    border-radius: 0;
-    box-shadow: none;
-    padding: 10px 8px;
-  }
-</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+  <title>Up to 8 Strings • One Octave • Offsets + Scale/Triad + Labels</title>
+  <style>
+    :root{
+      --bg:#0f1220; --card:#171a2b; --ink:#e6e8f2; --muted:#a9afc6; --accent:#7aa2ff; --accent-2:#67e8f9;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%;margin:0;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial,"Noto Sans";color:var(--ink);background:radial-gradient(1200px 800px at 30% 0%, #121633 0%, var(--bg) 50%);display:flex;align-items:center;justify-content:center;padding:12px}
+    .app{width:min(1200px,96vw);background:linear-gradient(180deg,rgba(255,255,255,.02),rgba(255,255,255,0));border:1px solid rgba(255,255,255,.08);border-radius:22px;padding:14px clamp(8px,2vw,20px);box-shadow:0 20px 50px rgba(0,0,0,.35), inset 0 0 0 1px rgba(255,255,255,.02)}
+    .hdr{display:flex;align-items:flex-end;justify-content:space-between;gap:8px;flex-wrap:wrap}
+    .title{font-weight:800;letter-spacing:.3px;font-size:clamp(16px,4vw,24px)}
+    .subtitle{color:var(--muted);font-size:clamp(10px,2vw,12px)}
+
+    .controls{display:grid;gap:8px;margin-top:8px}
+    .panel, .slider-wrap{background:var(--card);border-radius:8px;padding:8px 10px;border:1px solid rgba(255,255,255,.06)}
+    .panel-inner{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+
+    .seg{display:inline-flex;flex-wrap:wrap;background:#20233b;border:1px solid rgba(255,255,255,.08);border-radius:10px;overflow:hidden}
+    .seg button{appearance:none;border:0;background:transparent;color:var(--ink);padding:6px 8px;font-weight:700;font-size:clamp(10px,2.5vw,12px);cursor:pointer;flex:1 1 auto;-webkit-tap-highlight-color:transparent}
+    .seg button+button{border-left:1px solid rgba(255,255,255,.08)}
+    .seg button.active{background:linear-gradient(90deg,var(--accent),var(--accent-2));color:#0b0e1d}
+
+    select{background:#20233b;color:var(--ink);border:1px solid rgba(255,255,255,.12);border-radius:8px;padding:6px 8px;font-weight:700;font-size:clamp(10px,2.5vw,12px)}
+
+    .string-ctrls{display:grid;grid-template-columns:1fr;gap:6px;max-height:180px;overflow:auto}
+    .row{display:grid;grid-template-columns:minmax(60px,1fr) 2fr minmax(50px,1fr);gap:6px;align-items:center}
+    .row label{font-size:clamp(10px,2vw,12px);color:var(--muted)}
+    .row .value{justify-self:end;font-size:clamp(10px,2vw,12px);color:#dfe7ff}
+
+    input[type="range"]{width:100%;appearance:none;height:4px;border-radius:999px;background:linear-gradient(90deg,var(--accent),var(--accent-2));outline:none}
+    input[type="range"]::-webkit-slider-thumb{appearance:none;width:14px;height:14px;border-radius:50%;background:white;border:2px solid var(--accent);box-shadow:0 1px 4px rgba(0,0,0,.4)}
+
+    .chip{padding:4px 8px;border-radius:999px;background:rgba(122,162,255,.12);border:1px solid rgba(122,162,255,.35);color:#dfe7ff;font-size:clamp(10px,2vw,12px)}
+
+    .string-card{margin-top:8px;background:var(--card);border-radius:8px;border:1px solid rgba(255,255,255,.06);padding:4px}
+    .boards{display:grid;grid-template-columns:1fr;gap:1px}
+    .board{position:relative;width:100%;height:clamp(28px,6.2vw,48px)}
+
+    svg{display:block;width:100%;height:100%}
+
+    .cells{position:absolute;inset:0;display:grid;grid-template-columns:repeat(12,1fr);align-items:center;gap:1px;padding:0 1px;pointer-events:none}
+    .cell{display:flex;align-items:center;justify-content:center;height:100%;border-radius:4px;color:var(--ink);font-weight:800;font-size:clamp(12px,3.5vw,20px);background:var(--card);outline:1px solid rgba(255,255,255,.06)}
+    .cell .pc{white-space:nowrap;word-break:keep-all}
+    .cell.highlight{background:#1f2648; outline:2px solid var(--accent)}
+    .cell.root{background:#1b2a3f; outline:2px solid var(--accent-2); box-shadow:0 0 0 3px rgba(103,232,249,.18) inset}
+    .cell.triad{box-shadow:0 0 0 2px #f59e0b inset}
+    .cell.triad-root{box-shadow:0 0 0 2px #fbbf24 inset, 0 0 0 4px rgba(251,191,36,.18) inset}
+
+    .footer{margin-top:4px;display:flex;justify-content:space-between;gap:8px;color:var(--muted);font-size:clamp(10px,2vw,12px);flex-wrap:wrap}
+    .code{font-family:ui-monospace,monospace;color:#d0d6ff}
+
+    .btn{appearance:none;border:1px solid rgba(255,255,255,.16);background:#20233b;color:var(--ink);padding:6px 8px;border-radius:10px;font-weight:700;font-size:clamp(10px,2.5vw,12px);cursor:pointer}
+    .btn:disabled{opacity:.5;cursor:not-allowed}
+
+    /* Canvas embed mode trims padding/borders and uses transparent background */
+    body.embed{
+      background:transparent;
+      display:block;
+      padding:0;
+    }
+    body.embed .app{
+      width:100%;
+      border:none;
+      border-radius:0;
+      box-shadow:none;
+      padding:10px 8px;
+    }
+
+    @media (max-width: 600px) {
+      .panel-inner {flex-direction: column; align-items: stretch;}
+      .seg {width: 100%;}
+      .boards {gap: 0;}
+      .cell {font-size: clamp(11px, 3.8vw, 18px);} /* ensure accidentals stay on one line */
+    }
+  </style>
 </head>
 <body>
-<div class="app">
-  <h1>Music Trainer App</h1>
-  <p>This is where your interactive trainer code will run.</p>
-</div>
+  <div class="app" id="app">
+    <div class="hdr">
+      <div>
+        <div class="title">Up to 8‑String Trainer · One Octave</div>
+        <div class="subtitle">Add/remove strings (1–8). Large note names. Highlight scales & triads by root.</div>
+      </div>
+      <div class="chip" id="currentStart">String 1 start: C</div>
+    </div>
 
-<script>
-(function(){
-  const params = new URLSearchParams(location.search);
-  const EMBED   = params.get('embed')   === '1' || params.get('embed')   === 'true';
-  const COMPACT = params.get('compact') === '1' || params.get('compact') === 'true';
+    <div class="controls">
+      <div class="panel">
+        <div class="panel-inner">
+          <div class="seg" role="tablist" aria-label="Scale mode">
+            <button id="mode-off"  class="active" data-mode="off">Off</button>
+            <button id="mode-major" data-mode="major">Major</button>
+            <button id="mode-penta" data-mode="penta">Pentatonic</button>
+          </div>
+          <label for="root" class="chip" style="background:transparent;border-color:rgba(255,255,255,.12);">Root</label>
+          <select id="root" aria-label="Root note">
+            <option value="0">C</option>
+            <option value="1">C#/Db</option>
+            <option value="2">D</option>
+            <option value="3">D#/Eb</option>
+            <option value="4">E</option>
+            <option value="5">F</option>
+            <option value="6">F#/Gb</option>
+            <option value="7">G</option>
+            <option value="8">G#/Ab</option>
+            <option value="9">A</option>
+            <option value="10">A#/Bb</option>
+            <option value="11">B</option>
+          </select>
+          <div class="seg" role="group" aria-label="String count">
+            <button id="removeStr" class="btn" title="Remove string">−</button>
+            <span class="chip" id="countChip">8 strings</span>
+            <button id="addStr" class="btn" title="Add string">+</button>
+          </div>
+          <div class="seg" role="tablist" aria-label="Triad mode">
+            <button class="triadBtn active" data-triad="off">Triad: Off</button>
+            <button class="triadBtn" data-triad="maj">Maj</button>
+            <button class="triadBtn" data-triad="min">Min</button>
+            <button class="triadBtn" data-triad="aug">Aug</button>
+            <button class="triadBtn" data-triad="dim">Dim</button>
+          </div>
+          <div class="seg" role="tablist" aria-label="Accidentals">
+            <button class="accBtn active" data-acc="both">Both</button>
+            <button class="accBtn" data-acc="sharps">Sharps</button>
+            <button class="accBtn" data-acc="flats">Flats</button>
+          </div>
+          <div class="seg" role="tablist" aria-label="Label mode">
+            <button class="labelBtn active" data-label="notes">Notes</button>
+            <button class="labelBtn" data-label="degrees">Degrees</button>
+          </div>
+        </div>
+      </div>
 
-  if (EMBED) { document.body.classList.add('embed'); }
-  if (COMPACT) {
-    const titleEl = document.querySelector('h1');
-    if (titleEl) titleEl.style.fontSize = 'clamp(14px,3.5vw,20px)';
-  }
+      <div class="panel">
+        <div class="panel-inner" style="justify-content:space-between">
+          <span class="chip">Per‑string offsets</span>
+        </div>
+        <div id="stringCtrls" class="string-ctrls"></div>
+      </div>
+    </div>
 
-  function postSize(){
-    const h = document.documentElement.scrollHeight;
-    try { parent.postMessage({ type:'trainer-resize', height:h }, '*'); } catch(e){}
-  }
-  const ro = new ResizeObserver(postSize);
-  ro.observe(document.documentElement);
-  window.addEventListener('load', postSize);
-  window.addEventListener('resize', postSize);
-  setTimeout(postSize, 300);
-})();
-</script>
+    <div class="string-card">
+      <div id="boards" class="boards"></div>
+    </div>
+
+    <div class="footer">
+      <div>Tips: use fewer strings on phones, or collapse the offset panel when practicing.</div>
+      <div class="code">v4.3-embed</div>
+    </div>
+  </div>
+
+  <script>
+    const PCS_SHARP = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
+    const PCS_FLAT  = ["C","Db","D","Eb","E","F","Gb","G","Ab","A","Bb","B"];
+
+    function buildOneOctave(startPC=0){
+      const notes=[]; let pc=startPC;
+      for(let i=0;i<12;i++){
+        const sharp=PCS_SHARP[pc]; const flat=PCS_FLAT[pc];
+        notes.push({
+          nameSharp: sharp,
+          nameFlat: flat,
+          nameBoth: sharp.includes('#')?`${sharp}/${flat}`:sharp,
+          pcIndex: pc
+        });
+        pc=(pc+1)%12;
+      }
+      return notes;
+    }
+    function rotate(arr,offset){const n=arr.length;const k=((offset%n)+n)%n;return arr.slice(k).concat(arr.slice(0,k));}
+
+    // Scale logic
+    const MODES = {
+      off:   { name:'Off',   intervals: [] },
+      major: { name:'Major', intervals: [0,2,4,5,7,9,11] },
+      penta: { name:'Penta', intervals: [0,2,4,7,9] }
+    };
+    function pcsFor(rootPc, mode){
+      const ivals = MODES[mode].intervals; const set = new Set();
+      ivals.forEach(semi => set.add((rootPc + semi) % 12));
+      return set;
+    }
+
+    // Triad logic
+    const TRIADS = {
+      off: {name:'Off', intervals: []},
+      maj: {name:'Major Triad', intervals: [0,4,7]},
+      min: {name:'Minor Triad', intervals: [0,3,7]},
+      aug: {name:'Augmented',   intervals: [0,4,8]},
+      dim: {name:'Diminished',  intervals: [0,3,6]},
+    };
+    function pcsForTriad(rootPc, triad){
+      const ivals = TRIADS[triad].intervals; const set = new Set();
+      ivals.forEach(semi => set.add((rootPc + semi) % 12));
+      return set;
+    }
+
+    // Degree/interval display (chromatic, relative to root)
+    const DEGREE_MAP = {
+      0:'1', 1:'♭2', 2:'2', 3:'♭3', 4:'3', 5:'4', 6:'♭5', 7:'5', 8:'♭6', 9:'6', 10:'♭7', 11:'7'
+    };
+
+    // State
+    const MAX_STRINGS = 8, MIN_STRINGS = 1;
+    const SUGGESTED_TUNINGS = [0,7,2,9,4,11,6,1]; // C, G, D, A, E, B, F#, C#
+    let stringTunings = SUGGESTED_TUNINGS.slice(0, 8);
+    let offsets = new Array(stringTunings.length).fill(0);
+
+    // Elements
+    const boardsEl = document.getElementById('boards');
+    const ctrlsEl = document.getElementById('stringCtrls');
+    const startChip=document.getElementById('currentStart');
+    const rootSel=document.getElementById('root');
+    const modeButtons=[...document.querySelectorAll('.seg button[data-mode]')];
+    const triadButtons=[...document.querySelectorAll('.triadBtn')];
+    const accButtons=[...document.querySelectorAll('.accBtn')];
+    const labelButtons=[...document.querySelectorAll('.labelBtn')];
+    const addBtn=document.getElementById('addStr');
+    const removeBtn=document.getElementById('removeStr');
+    const countChip=document.getElementById('countChip');
+
+    let currentMode='off';
+    let currentTriad='off';
+    let accMode='both';       // 'both' | 'sharps' | 'flats'
+    let labelMode='notes';    // 'notes' | 'degrees'
+
+    function buildStrings(){
+      return stringTunings.map(pc => buildOneOctave(pc));
+    }
+
+    function labelFor(note, accMode, rootPc){
+      if(labelMode === 'notes'){
+        if(accMode==='both') return note.nameBoth;
+        if(accMode==='sharps') return note.nameSharp;
+        return note.nameFlat; // flats
+      } else {
+        const delta = (note.pcIndex - rootPc + 12) % 12;
+        return DEGREE_MAP[delta];
+      }
+    }
+
+    function renderControls(){
+      ctrlsEl.innerHTML = '';
+      stringTunings.forEach((_, idx) => {
+        const wrap = document.createElement('div');
+        wrap.className = 'slider-wrap';
+        wrap.innerHTML = `
+          <div class="row">
+            <label for="off${idx}">String ${idx+1} offset</label>
+            <input id="off${idx}" type="range" min="0" max="11" step="1" value="${offsets[idx]||0}" />
+            <div class="value" id="val${idx}">${offsets[idx]||0} st</div>
+          </div>`;
+        ctrlsEl.appendChild(wrap);
+      });
+
+      // attach listeners
+      stringTunings.forEach((_, idx) => {
+        const sl = document.getElementById(`off${idx}`);
+        const val = document.getElementById(`val${idx}`);
+        sl.addEventListener('input', () => {
+          offsets[idx] = parseInt(sl.value,10)||0;
+          val.textContent = `${offsets[idx]} st`;
+          renderBoards();
+        });
+      });
+
+      // update buttons
+      countChip.textContent = `${stringTunings.length} ${stringTunings.length===1?'string':'strings'}`;
+      addBtn.disabled = stringTunings.length >= MAX_STRINGS;
+      removeBtn.disabled = stringTunings.length <= MIN_STRINGS;
+    }
+
+    function renderBoards(){
+      const rootPc = parseInt(rootSel.value,10)||0;
+      const highlightSet = currentMode==='off' ? new Set() : pcsFor(rootPc, currentMode);
+      const triadSet = currentTriad==='off' ? new Set() : pcsForTriad(rootPc, currentTriad);
+      boardsEl.innerHTML = '';
+
+      const baseStrings = buildStrings();
+
+      baseStrings.forEach((baseNotes, sIdx) => {
+        const rotated = rotate(baseNotes, offsets[sIdx]||0);
+        if(sIdx===0){ startChip.textContent = `String 1 start: ${labelFor(rotated[0], accMode, rootPc)}`; }
+
+        const board=document.createElement('div'); board.className='board';
+        const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
+        svg.setAttribute('viewBox','0 0 100 25'); svg.setAttribute('preserveAspectRatio','none');
+        const line=document.createElementNS('http://www.w3.org/2000/svg','line');
+        line.setAttribute('x1','0'); line.setAttribute('y1','12.5'); line.setAttribute('x2','100'); line.setAttribute('y2','12.5');
+        line.setAttribute('stroke','#7aa2ff'); line.setAttribute('stroke-width','0.8');
+        svg.appendChild(line); board.appendChild(svg);
+
+        const cells=document.createElement('div'); cells.className='cells';
+        rotated.forEach(n=>{
+          const cell=document.createElement('div'); cell.className='cell';
+          if(currentMode !== 'off'){
+            if(n.pcIndex === rootPc){ cell.classList.add('root'); }
+            if(highlightSet.has(n.pcIndex)){ cell.classList.add('highlight'); }
+          }
+          if(currentTriad !== 'off'){
+            if(n.pcIndex === rootPc){ cell.classList.add('triad-root'); }
+            if(triadSet.has(n.pcIndex)){ cell.classList.add('triad'); }
+          }
+          const pc=document.createElement('div'); pc.className='pc'; pc.textContent = labelFor(n, accMode, rootPc);
+          cell.appendChild(pc); cells.appendChild(cell);
+        });
+        board.appendChild(cells); boardsEl.appendChild(board);
+      });
+
+      // try to notify parent iframe about size changes
+      postSize();
+    }
+
+    // Mode + root listeners
+    rootSel.addEventListener('change', renderBoards);
+    modeButtons.forEach(btn=>btn.addEventListener('click',()=>{
+      modeButtons.forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active'); currentMode = btn.dataset.mode; renderBoards();
+    }));
+    triadButtons.forEach(btn=>btn.addEventListener('click',()=>{
+      triadButtons.forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active'); currentTriad = btn.dataset.triad; renderBoards();
+    }));
+    accButtons.forEach(btn=>btn.addEventListener('click',()=>{
+      accButtons.forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active'); accMode = btn.dataset.acc; renderBoards();
+    }));
+    labelButtons.forEach(btn=>btn.addEventListener('click',()=>{
+      labelButtons.forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active'); labelMode = btn.dataset.label; renderBoards();
+    }));
+
+    // Add/remove strings (bounded 1..8)
+    addBtn.addEventListener('click', () => {
+      if(stringTunings.length >= MAX_STRINGS) return;
+      const nextIdx = stringTunings.length % SUGGESTED_TUNINGS.length;
+      stringTunings.push(SUGGESTED_TUNINGS[nextIdx]);
+      offsets.push(0);
+      renderControls();
+      renderBoards();
+    });
+    removeBtn.addEventListener('click', () => {
+      if(stringTunings.length <= MIN_STRINGS) return;
+      stringTunings.pop(); offsets.pop();
+      renderControls();
+      renderBoards();
+    });
+
+    // Initial render
+    renderControls();
+    renderBoards();
+
+    // --- Embed mode: URL params + auto-height for Canvas iframes ---
+    const params = new URLSearchParams(location.search);
+    const EMBED   = params.get('embed')   === '1' || params.get('embed')   === 'true';
+    const COMPACT = params.get('compact') === '1' || params.get('compact') === 'true';
+    if (EMBED) { document.body.classList.add('embed'); }
+    if (COMPACT) {
+      const titleEl = document.querySelector('.title');
+      if (titleEl) titleEl.style.fontSize = 'clamp(14px,3.5vw,20px)';
+    }
+    function postSize(){
+      const h = document.documentElement.scrollHeight;
+      try { parent.postMessage({ type:'trainer-resize', height:h }, '*'); } catch(e){}
+    }
+    const ro = new ResizeObserver(postSize);
+    ro.observe(document.documentElement);
+    window.addEventListener('load', postSize);
+    window.addEventListener('resize', postSize);
+    setTimeout(postSize, 300);
+
+    // Basic runtime checks (simple tests)
+    console.assert(typeof MAX_STRINGS === 'number' && typeof MIN_STRINGS === 'number', 'Constants not defined');
+    console.assert(document.querySelectorAll('#boards .board').length === stringTunings.length, 'Board count mismatch after initial render');
+  </script>
 </body>
 </html>
