@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+  <title>Up to 8 Strings • One Octave • Per-String Offsets + Scale/Triad Highlight + Fretboard</title>
+  <style>
+    :root{ --bg:#0f1220; --card:#171a2b; --ink:#e6e8f2; --muted:#a9afc6; --accent:#7aa2ff; --accent-2:#67e8f9; --accent-3:#3b82f6; }
+    *{box-sizing:border-box}
+    html,body{height:100%;margin:0;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial,"Noto Sans";color:var(--ink);background:radial-gradient(1200px 800px at 30% 0%, #121633 0%, var(--bg) 50%);display:flex;align-items:center;justify-content:center;padding:12px}
+    .app{width:min(1200px,96vw);background:linear-gradient(180deg,rgba(255,255,255,.02),rgba(255,255,255,0));border:1px solid rgba(255,255,255,.08);border-radius:22px;padding:14px clamp(8px,2vw,20px);box-shadow:0 20px 50px rgba(0,0,0,.35), inset 0 0 0 1px rgba(255,255,255,.02)}
+    .hdr{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+    .title{font-weight:800;letter-spacing:.3px;font-size:clamp(16px,4vw,24px)}
+    .subtitle{color:var(--muted);font-size:clamp(10px,2vw,12px)}
+    .controls{display:grid;gap:8px;margin-top:8px}
+    .panel, .slider-wrap{background:var(--card);border-radius:8px;padding:8px 10px;border:1px solid rgba(255,255,255,.06)}
+    .panel-inner{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+    .seg{display:inline-flex;flex-wrap:wrap;background:#20233b;border:1px solid rgba(255,255,255,.08);border-radius:10px;overflow:hidden}
+    .seg button{appearance:none;border:0;background:transparent;color:var(--ink);padding:6px 8px;font-weight:700;font-size:clamp(10px,2.5vw,12px);cursor:pointer;flex:1 1 auto;-webkit-tap-highlight-color:transparent}
+    .seg button+button{border-left:1px solid rgba(255,255,255,.08)}
+    .seg button.active{background:linear-gradient(90deg,var(--accent),var(--accent-2));color:#0b0e1d}
+    select{background:#20233b;color:var(--ink);border:1px solid rgba(255,255,255,.12);border-radius:8px;padding:6px 8px;font-weight:700;font-size:clamp(10px,2.5vw,12px)}
+    .string-ctrls{display:grid;grid-template-columns:1fr;gap:6px;max-height:180px;overflow:auto}
+    .row{display:grid;grid-template-columns:minmax(60px,1fr) 2fr minmax(50px,1fr);gap:6px;align-items:center}
+    .row label{font-size:clamp(10px,2vw,12px);color:var(--muted)}
+    .row .value{justify-self:end;font-size:clamp(10px,2vw,12px);color:#dfe7ff}
+    input[type="range"]{width:100%;appearance:none;height:4px;border-radius:999px;background:linear-gradient(90deg,var(--accent),var(--accent-2));outline:none}
+    input[type="range"]::-webkit-slider-thumb{appearance:none;width:14px;height:14px;border-radius:50%;background:white;border:2px solid var(--accent);box-shadow:0 1px 4px rgba(0,0,0,.4)}
+    .chip{padding:4px 8px;border-radius:999px;background:rgba(122,162,255,.12);border:1px solid rgba(122,162,255,.35);color:#dfe7ff;font-size:clamp(10px,2vw,12px)}
+    .string-card{margin-top:8px;background:var(--card);border-radius:8px;border:1px solid rgba(255,255,255,.06);padding:4px}
+    .boards{display:grid;grid-template-columns:1fr;gap:1px}
+    .board{position:relative;width:100%;height:clamp(28px,6.2vw,48px)}
+    svg{display:block;width:100%;height:100%}
+    .cells{position:absolute;inset:0;display:grid;grid-template-columns:repeat(12,1fr);align-items:center;gap:1px;padding:0 1px;pointer-events:none}
+    .cell{display:flex;align-items:center;justify-content:center;height:100%;border-radius:4px;color:var(--ink);font-weight:800;font-size:clamp(12px,3.5vw,20px);background:var(--card);outline:1px solid rgba(255,255,255,.06)}
+    .cell .pc{white-space:nowrap;word-break:keep-all}
+    .cell.highlight{background:#1f2648; outline:2px solid var(--accent)}
+    .cell.root{background:#1b2a3f; outline:2px solid var(--accent-2); box-shadow:0 0 0 3px rgba(103,232,249,.18) inset}
+    .cell.triad{box-shadow:0 0 0 2px #f59e0b inset}
+    .cell.triad-root{box-shadow:0 0 0 2px #fbbf24 inset, 0 0 0 4px rgba(251,191,36,.18) inset}
+    .fretboard-card{margin-top:10px;background:#14151f;border-radius:10px;border:1px solid rgba(255,255,255,.06);padding:10px}
+    .fb-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+    .fb-title{font-weight:800;font-size:14px;color:#dbe5ff}
+    .fretboard{width:100%;overflow-x:auto}
+    .fbsvg{width:100%;height:auto;display:block;background:#fbf7ec;border-radius:8px;border:1px solid #e5decf}
+    .fb-note{font-weight:800;dominant-baseline:middle;text-anchor:middle;fill:#a7a7a7}
+    /* Highlight badges: ALL highlighted notes use the filled badge (root style) */
+    .fb-circle,
+    .fb-circle-root{fill:var(--accent-3);stroke:#0b0e1d;stroke-width:1}
+    .fb-degree{font-weight:800;dominant-baseline:middle;text-anchor:middle;fill:#0b0e1d}
+    @media (max-width: 600px){.panel-inner{flex-direction:column;align-items:stretch}.seg{width:100%}.boards{gap:0}.cell{font-size:clamp(11px,3.8vw,18px)}}
+  </style>
+</head>
+<body>
+  <div class="app" id="app">
+    <div class="hdr">
+      <div style="display:flex;flex-direction:column;gap:2px;min-width:230px">
+        <div class="title">Up to 8-String Trainer · One Octave</div>
+        <div class="subtitle">Add/remove strings (1–8). Highlight scales/triads. Notes or degrees.</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <div class="chip" id="currentStart">String 1 start: C</div>
+        <label class="chip" for="instrument" style="background:transparent;border-color:rgba(255,255,255,.12);">Instrument</label>
+        <select id="instrument" aria-label="Instrument">
+          <option value="gtr6">6-string Guitar (EBGDAE top→bottom)</option>
+          <option value="gtr7">7-string Guitar (EBGDABE top→bottom)</option>
+          <option value="gtr8">8-string Guitar (EBGDABEF# top→bottom)</option>
+          <option value="bass4">4-string Bass (EGDA top→bottom)</option>
+          <option value="bass5">5-string Bass (EGDAB top→bottom)</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="controls">
+      <div class="panel">
+        <div class="panel-inner">
+          <div class="seg" role="tablist" aria-label="Scale mode">
+            <button id="mode-off" class="active" data-mode="off">Off</button>
+            <button id="mode-major" data-mode="major">Major</button>
+            <button id="mode-penta" data-mode="penta">Pentatonic</button>
+          </div>
+          <label for="root" class="chip" style="background:transparent;border-color:rgba(255,255,255,.12);">Root</label>
+          <select id="root" aria-label="Root note">
+            <option value="0">C</option>
+            <option value="1">C#/Db</option>
+            <option value="2">D</option>
+            <option value="3">D#/Eb</option>
+            <option value="4">E</option>
+            <option value="5">F</option>
+            <option value="6">F#/Gb</option>
+            <option value="7">G</option>
+            <option value="8">G#/Ab</option>
+            <option value="9">A</option>
+            <option value="10">A#/Bb</option>
+            <option value="11">B</option>
+          </select>
+          <div class="seg" role="group" aria-label="String count">
+            <button id="removeStr" class="btn" title="Remove string">−</button>
+            <span class="chip" id="countChip">6 strings</span>
+            <button id="addStr" class="btn" title="Add string">+</button>
+          </div>
+          <div class="seg" role="tablist" aria-label="Triad mode">
+            <button class="triadBtn active" data-triad="off">Triad: Off</button>
+            <button class="triadBtn" data-triad="maj">Maj</button>
+            <button class="triadBtn" data-triad="min">Min</button>
+            <button class="triadBtn" data-triad="aug">Aug</button>
+            <button class="triadBtn" data-triad="dim">Dim</button>
+          </div>
+          <div class="seg" role="tablist" aria-label="Accidentals">
+            <button class="accBtn active" data-acc="both">Both</button>
+            <button class="accBtn" data-acc="sharps">Sharps</button>
+            <button class="accBtn" data-acc="flats">Flats</button>
+          </div>
+          <div class="seg" role="tablist" aria-label="Label mode">
+            <button class="labelBtn active" data-label="notes">Notes</button>
+            <button class="labelBtn" data-label="degrees">Degrees</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-inner" style="justify-content:space-between">
+          <span class="chip">Per-string offsets</span>
+        </div>
+        <div id="stringCtrls" class="string-ctrls"></div>
+      </div>
+    </div>
+
+    <div class="string-card">
+      <div id="boards" class="boards"></div>
+    </div>
+
+    <div class="fretboard-card">
+      <div class="fb-header">
+        <div class="fb-title">Fretboard (reflects selections above)</div>
+        <div class="chip" id="fbMeta">12 frets • Standard markers</div>
+      </div>
+      <div id="fretboard" class="fretboard"></div>
+    </div>
+
+    <div class="footer">
+      <div>Tips: use fewer strings on phones, or collapse the offset panel when practicing.</div>
+      <div class="code">v5.2</div>
+    </div>
+  </div>
+
+  <script>
+    const PCS_SHARP = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
+    const PCS_FLAT  = ["C","Db","D","Eb","E","F","Gb","G","Ab","A","Bb","B"];
+
+    // Internal tunings remain low-to-high for theory math
+    const INSTRUMENT_TUNINGS = {
+      gtr6:  { name:'6-string Guitar', pcs:[4,9,2,7,11,4] },        // E A D G B E
+      gtr7:  { name:'7-string Guitar', pcs:[11,4,9,2,7,11,4] },     // B E A D G B E
+      gtr8:  { name:'8-string Guitar', pcs:[6,11,4,9,2,7,11,4] },   // F# B E A D G B E
+      bass4: { name:'4-string Bass',   pcs:[4,9,2,7] },             // E A D G
+      bass5: { name:'5-string Bass',   pcs:[11,4,9,2,7] }           // B E A D G
+    };
+
+    function buildOneOctave(startPC=0){
+      const notes=[]; let pc=startPC;
+      for(let i=0;i<12;i++){
+        const sharp=PCS_SHARP[pc]; const flat=PCS_FLAT[pc];
+        notes.push({ nameSharp: sharp, nameFlat: flat, nameBoth: sharp.includes('#')?`${sharp}/${flat}`:sharp, pcIndex: pc });
+        pc=(pc+1)%12;
+      }
+      return notes;
+    }
+    function rotate(arr,offset){const n=arr.length;const k=((offset%n)+n)%n;return arr.slice(k).concat(arr.slice(0,k));}
+
+    // Scales / Triads
+    const MODES = { off:{name:'Off',intervals:[]}, major:{name:'Major',intervals:[0,2,4,5,7,9,11]}, penta:{name:'Penta',intervals:[0,2,4,7,9]} };
+    const TRIADS = { off:{name:'Off',intervals:[]}, maj:{name:'Major Triad',intervals:[0,4,7]}, min:{name:'Minor Triad',intervals:[0,3,7]}, aug:{name:'Augmented',intervals:[0,4,8]}, dim:{name:'Diminished',intervals:[0,3,6]} };
+    function pcsFor(rootPc, mode){const set=new Set(); MODES[mode].intervals.forEach(semi=>set.add((rootPc+semi)%12)); return set;}
+    function pcsForTriad(rootPc, triad){const set=new Set(); TRIADS[triad].intervals.forEach(semi=>set.add((rootPc+semi)%12)); return set;}
+    const DEGREE_MAP = {0:'1',1:'♭2',2:'2',3:'♭3',4:'3',5:'4',6:'♭5',7:'5',8:'♭6',9:'6',10:'♭7',11:'7'};
+
+    // State
+    const MAX_STRINGS=8, MIN_STRINGS=1;
+    let currentInstrument='gtr6';
+    let stringTunings=INSTRUMENT_TUNINGS[currentInstrument].pcs.slice(); // low→high internally
+    let offsets=new Array(stringTunings.length).fill(0);
+
+    // Elements
+    const boardsEl=document.getElementById('boards');
+    const ctrlsEl=document.getElementById('stringCtrls');
+    const startChip=document.getElementById('currentStart');
+    const rootSel=document.getElementById('root');
+    const instrumentSel=document.getElementById('instrument');
+    const modeButtons=[...document.querySelectorAll('.seg button[data-mode]')];
+    const triadButtons=[...document.querySelectorAll('.triadBtn')];
+    const accButtons=[...document.querySelectorAll('.accBtn')];
+    const labelButtons=[...document.querySelectorAll('.labelBtn')];
+    const addBtn=document.getElementById('addStr');
+    const removeBtn=document.getElementById('removeStr');
+    const countChip=document.getElementById('countChip');
+    const fbEl=document.getElementById('fretboard');
+
+    let currentMode='off';
+    let currentTriad='off';
+    let accMode='both';
+    let labelMode='notes';
+
+    function buildStrings(){ return stringTunings.map(pc=>buildOneOctave(pc)); }
+    function labelFor(note, accMode, rootPc){
+      if(labelMode==='notes'){
+        if(accMode==='both') return note.nameBoth;
+        if(accMode==='sharps') return note.nameSharp;
+        return note.nameFlat;
+      }
+      const delta=(note.pcIndex-rootPc+12)%12; return DEGREE_MAP[delta];
+    }
+
+    function setInstrument(key){
+      currentInstrument=key;
+      stringTunings=INSTRUMENT_TUNINGS[key].pcs.slice();
+      offsets=new Array(stringTunings.length).fill(0);
+      renderControls(); renderBoards(); renderFretboard();
+    }
+
+    // --- Controls (flipped: top = highest string) ---
+    function renderControls(){
+      ctrlsEl.innerHTML='';
+      const n=stringTunings.length;
+      for(let disp=0; disp<n; disp++){
+        const realIdx=n-1-disp; // map display index to real(low→high)
+        const wrap=document.createElement('div');
+        wrap.className='slider-wrap';
+        wrap.innerHTML=`
+          <div class="row">
+            <label for="offR${realIdx}">String ${disp+1} offset</label>
+            <input id="offR${realIdx}" data-real="${realIdx}" type="range" min="0" max="11" step="1" value="${offsets[realIdx]||0}" />
+            <div class="value" id="valR${realIdx}">${offsets[realIdx]||0} st</div>
+          </div>`;
+        ctrlsEl.appendChild(wrap);
+      }
+      for(let realIdx=0; realIdx<n; realIdx++){
+        const sl=document.getElementById(`offR${realIdx}`);
+        const val=document.getElementById(`valR${realIdx}`);
+        if(!sl||!val) continue;
+        sl.addEventListener('input', ()=>{
+          offsets[realIdx]=parseInt(sl.value,10)||0;
+          val.textContent=`${offsets[realIdx]} st`;
+          renderBoards(); renderFretboard();
+        });
+      }
+      countChip.textContent=`${stringTunings.length} ${stringTunings.length===1?'string':'strings'}`;
+      addBtn.disabled=stringTunings.length>=MAX_STRINGS;
+      removeBtn.disabled=stringTunings.length<=MIN_STRINGS;
+    }
+
+    // --- Boards (rows) flipped ---
+    function renderBoards(){
+      const rootPc=parseInt(rootSel.value,10)||0;
+      const highlightSet=currentMode==='off'?new Set():pcsFor(rootPc,currentMode);
+      const triadSet=currentTriad==='off'?new Set():pcsForTriad(rootPc,currentTriad);
+      boardsEl.innerHTML='';
+      const baseStrings=buildStrings();
+      const n=baseStrings.length;
+      for(let disp=0; disp<n; disp++){
+        const realIdx=n-1-disp;
+        const baseNotes=baseStrings[realIdx];
+        const rotated=rotate(baseNotes, offsets[realIdx]||0);
+        if(disp===0){ startChip.textContent=`String 1 start: ${labelFor(rotated[0], accMode, rootPc)}`; }
+        const board=document.createElement('div'); board.className='board';
+        const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
+        svg.setAttribute('viewBox','0 0 100 25'); svg.setAttribute('preserveAspectRatio','none');
+        const line=document.createElementNS('http://www.w3.org/2000/svg','line');
+        line.setAttribute('x1','0'); line.setAttribute('y1','12.5'); line.setAttribute('x2','100'); line.setAttribute('y2','12.5');
+        line.setAttribute('stroke','#7aa2ff'); line.setAttribute('stroke-width','0.8');
+        svg.appendChild(line); board.appendChild(svg);
+        const cells=document.createElement('div'); cells.className='cells';
+        rotated.forEach(n=>{
+          const cell=document.createElement('div'); cell.className='cell';
+          if(currentMode!=='off'){
+            if(n.pcIndex===rootPc) cell.classList.add('root');
+            if(highlightSet.has(n.pcIndex)) cell.classList.add('highlight');
+          }
+          if(currentTriad!=='off'){
+            if(n.pcIndex===rootPc) cell.classList.add('triad-root');
+            if(triadSet.has(n.pcIndex)) cell.classList.add('triad');
+          }
+          const pc=document.createElement('div'); pc.className='pc'; pc.textContent=labelFor(n, accMode, rootPc);
+          cell.appendChild(pc); cells.appendChild(cell);
+        });
+        board.appendChild(cells); boardsEl.appendChild(board);
+      }
+    }
+
+    // --- Fretboard flipped vertically ---
+    function renderFretboard(){
+      const frets=12; const w=1100, h=Math.max(140, stringTunings.length*40);
+      const nutWidth=10, fbPad=18;
+      const stringGap=(h-fbPad*2)/(stringTunings.length-1||1);
+      const fretGap=(w-fbPad*2-nutWidth)/frets;
+      const rootPc=parseInt(rootSel.value,10)||0;
+
+      const svgns='http://www.w3.org/2000/svg';
+      const svg=document.createElementNS(svgns,'svg');
+      svg.setAttribute('class','fbsvg');
+      svg.setAttribute('viewBox',`0 0 ${w} ${h}`);
+      svg.setAttribute('preserveAspectRatio','none');
+
+      const bg=document.createElementNS(svgns,'rect'); bg.setAttribute('x','0'); bg.setAttribute('y','0'); bg.setAttribute('width',w); bg.setAttribute('height',h); bg.setAttribute('fill','#fbf7ec'); svg.appendChild(bg);
+
+      for(let f=0; f<=frets; f++){
+        const x=fbPad+nutWidth+f*fretGap;
+        const line=document.createElementNS(svgns,'line');
+        line.setAttribute('x1',x); line.setAttribute('x2',x); line.setAttribute('y1',fbPad); line.setAttribute('y2',h-fbPad);
+        line.setAttribute('stroke', f===0?'#8a877e':'#c7c1b0');
+        line.setAttribute('stroke-width', f===0?6:2);
+        svg.appendChild(line);
+      }
+
+      // string lines (flipped order)
+      for(let disp=0; disp<stringTunings.length; disp++){
+        const y=fbPad + disp*stringGap;
+        const str=document.createElementNS(svgns,'line');
+        str.setAttribute('x1',fbPad); str.setAttribute('x2',w-fbPad); str.setAttribute('y1',y); str.setAttribute('y2',y);
+        str.setAttribute('stroke','#cfae86'); str.setAttribute('stroke-width',2);
+        svg.appendChild(str);
+      }
+
+      // markers
+      const markerFrets=[3,5,7,9,12];
+      markerFrets.forEach(f=>{
+        const x=fbPad+nutWidth+(f-0.5)*fretGap;
+        if(f===12){
+          const c1=document.createElementNS(svgns,'circle'); c1.setAttribute('cx',x-10); c1.setAttribute('cy', h/2 - stringGap/2); c1.setAttribute('r',6); c1.setAttribute('fill','#e2d9c2'); svg.appendChild(c1);
+          const c2=document.createElementNS(svgns,'circle'); c2.setAttribute('cx',x+10); c2.setAttribute('cy', h/2 + stringGap/2); c2.setAttribute('r',6); c2.setAttribute('fill','#e2d9c2'); svg.appendChild(c2);
+        } else {
+          const c=document.createElementNS(svgns,'circle'); c.setAttribute('cx',x); c.setAttribute('cy', h/2); c.setAttribute('r',6); c.setAttribute('fill','#e2d9c2'); svg.appendChild(c);
+        }
+      });
+
+      // notes/highlights
+      for(let disp=0; disp<stringTunings.length; disp++){
+        const realIdx=stringTunings.length-1-disp; // map display to real
+        const openPc=stringTunings[realIdx];
+        const y=fbPad + disp*stringGap;
+        for(let f=0; f<=frets; f++){
+          const xCenter=fbPad + nutWidth + f*fretGap - (f===0? -nutWidth/2 : fretGap/2);
+          const pc=(openPc + f + (offsets[realIdx]||0)) % 12;
+          const tmpNote={ pcIndex:pc, nameSharp:PCS_SHARP[pc], nameFlat:PCS_FLAT[pc], nameBoth: PCS_SHARP[pc].includes('#')? `${PCS_SHARP[pc]}/${PCS_FLAT[pc]}` : PCS_SHARP[pc] };
+          const label=(labelMode==='notes' ? (accMode==='both'?tmpNote.nameBoth:accMode==='sharps'?tmpNote.nameSharp:tmpNote.nameFlat) : DEGREE_MAP[(pc-rootPc+12)%12]);
+
+          // base faint label
+          const text=document.createElementNS(svgns,'text');
+          text.setAttribute('x',xCenter); text.setAttribute('y',y+2);
+          text.setAttribute('class','fb-note');
+          text.setAttribute('font-size',14);
+          text.textContent=label;
+          svg.appendChild(text);
+
+          const inScale=currentMode!=='off' && pcsFor(rootPc,currentMode).has(pc);
+          const inTriad=currentTriad!=='off' && pcsForTriad(rootPc,currentTriad).has(pc);
+
+          if(inScale || inTriad){
+            const r=14;
+
+            // hide faint label so it doesn't clash with the badge
+            text.setAttribute('visibility','hidden');
+
+            // draw filled badge for ALL highlights (same style as previous root)
+            const circ=document.createElementNS(svgns,'circle');
+            circ.setAttribute('cx',xCenter); circ.setAttribute('cy',y);
+            circ.setAttribute('r',r);
+            circ.setAttribute('class','fb-circle');
+            svg.appendChild(circ);
+
+            // high-contrast label on badge
+            const strong=document.createElementNS(svgns,'text');
+            strong.setAttribute('x',xCenter); strong.setAttribute('y',y+2);
+            strong.setAttribute('class','fb-degree');
+            strong.setAttribute('font-size',13);
+            strong.textContent=label;
+            svg.appendChild(strong);
+          }
+        }
+      }
+
+      fbEl.innerHTML=''; fbEl.appendChild(svg);
+    }
+
+    // Listeners
+    rootSel.addEventListener('change', ()=>{ renderBoards(); renderFretboard(); });
+    instrumentSel.addEventListener('change', ()=>{ setInstrument(instrumentSel.value); });
+    modeButtons.forEach(btn=>btn.addEventListener('click',()=>{ modeButtons.forEach(b=>b.classList.remove('active')); btn.classList.add('active'); currentMode=btn.dataset.mode; renderBoards(); renderFretboard(); }));
+    triadButtons.forEach(btn=>btn.addEventListener('click',()=>{ triadButtons.forEach(b=>b.classList.remove('active')); btn.classList.add('active'); currentTriad=btn.dataset.triad; renderBoards(); renderFretboard(); }));
+    accButtons.forEach(btn=>btn.addEventListener('click',()=>{ accButtons.forEach(b=>b.classList.remove('active')); btn.classList.add('active'); accMode=btn.dataset.acc; renderBoards(); renderFretboard(); }));
+    labelButtons.forEach(btn=>btn.addEventListener('click',()=>{ labelButtons.forEach(b=>b.classList.remove('active')); btn.classList.add('active'); labelMode=btn.dataset.label; renderBoards(); renderFretboard(); }));
+
+    // Add/remove strings (still operates on low string internally)
+    addBtn.addEventListener('click', ()=>{
+      if(stringTunings.length>=MAX_STRINGS) return;
+      const lowest=stringTunings[0];
+      stringTunings.unshift((lowest+7)%12); // add a fifth below
+      offsets.unshift(0);
+      renderControls(); renderBoards(); renderFretboard();
+    });
+    removeBtn.addEventListener('click', ()=>{
+      if(stringTunings.length<=MIN_STRINGS) return;
+      stringTunings.shift(); offsets.shift();
+      renderControls(); renderBoards(); renderFretboard();
+    });
+
+    // Initial render
+    renderControls(); renderBoards(); renderFretboard();
+    console.assert(document.querySelectorAll('#boards .board').length===stringTunings.length, 'Board count mismatch after initial render');
+  </script>
+</body>
+</html>
